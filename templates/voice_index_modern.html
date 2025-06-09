@@ -1,0 +1,1022 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clinic Voice AI - Noor Medical Demo</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        :root {
+            --primary: #4a6fa5;
+            --primary-light: #6989b9;
+            --primary-dark: #3a5a8c;
+            --secondary: #6c757d;
+            --success: #4caf50;
+            --danger: #f44336;
+            --warning: #ff9800;
+            --info: #2196f3;
+            --light: #f8f9fa;
+            --dark: #343a40;
+            --white: #ffffff;
+            --gray-100: #f8f9fa;
+            --gray-200: #e9ecef;
+            --gray-300: #dee2e6;
+            --gray-400: #ced4da;
+            --gray-500: #adb5bd;
+            --gray-600: #6c757d;
+            --gray-700: #495057;
+            --gray-800: #343a40;
+            --gray-900: #212529;
+            --font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            --border-radius: 8px;
+            --box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            --transition: all 0.3s ease;
+        }
+
+        /* Dark mode variables */
+        .dark-mode {
+            --primary: #5d8acd;
+            --primary-light: #7aa3e0;
+            --primary-dark: #4a6fa5;
+            --secondary: #8c98a4;
+            --success: #66bb6a;
+            --danger: #e57373;
+            --warning: #ffb74d;
+            --info: #64b5f6;
+            --light: #2d3748;
+            --dark: #1a202c;
+            --white: #1a202c;
+            --gray-100: #2d3748;
+            --gray-200: #4a5568;
+            --gray-300: #718096;
+            --gray-400: #a0aec0;
+            --gray-500: #cbd5e0;
+            --gray-600: #e2e8f0;
+            --gray-700: #edf2f7;
+            --gray-800: #f7fafc;
+            --gray-900: #ffffff;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--font-family);
+            background-color: var(--gray-100);
+            color: var(--gray-800);
+            line-height: 1.6;
+            transition: var(--transition);
+        }
+
+        .app-container {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        .header {
+            background-color: var(--primary);
+            color: var(--white);
+            padding: 1rem;
+            box-shadow: var(--box-shadow);
+            z-index: 10;
+        }
+
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+        }
+
+        .logo i {
+            margin-right: 0.5rem;
+        }
+
+        .theme-toggle {
+            background: none;
+            border: none;
+            color: var(--white);
+            font-size: 1.2rem;
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 50%;
+            transition: var(--transition);
+        }
+
+        .theme-toggle:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            max-width: 1200px;
+            margin: 1rem auto;
+            border-radius: var(--border-radius);
+            overflow: hidden;
+            box-shadow: var(--box-shadow);
+            background-color: var(--white);
+        }
+
+        .sidebar {
+            width: 300px;
+            background-color: var(--gray-100);
+            border-right: 1px solid var(--gray-200);
+            display: flex;
+            flex-direction: column;
+            transition: var(--transition);
+        }
+
+        .call-controls {
+            padding: 1.5rem;
+        }
+
+        .call-controls h2 {
+            font-size: 1.2rem;
+            margin-bottom: 1.5rem;
+            color: var(--gray-700);
+            font-weight: 600;
+        }
+
+        .btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.75rem 1rem;
+            border: none;
+            border-radius: var(--border-radius);
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: var(--transition);
+            margin-bottom: 0.75rem;
+            width: 100%;
+            text-align: center;
+        }
+
+        .btn i {
+            margin-right: 0.5rem;
+        }
+
+        .btn-primary {
+            background-color: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--primary-dark);
+        }
+
+        .btn-success {
+            background-color: var(--success);
+            color: white;
+        }
+
+        .btn-success:hover {
+            background-color: #3d8b40;
+        }
+
+        .btn-danger {
+            background-color: var(--danger);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background-color: #d32f2f;
+        }
+
+        .btn-disabled {
+            background-color: var(--gray-400);
+            color: var(--gray-600);
+            cursor: not-allowed;
+        }
+
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            margin: 1rem 0;
+        }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 48px;
+            height: 24px;
+            margin-right: 0.75rem;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--gray-300);
+            transition: var(--transition);
+            border-radius: 24px;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: var(--transition);
+            border-radius: 50%;
+        }
+
+        input:checked + .toggle-slider {
+            background-color: var(--primary);
+        }
+
+        input:checked + .toggle-slider:before {
+            transform: translateX(24px);
+        }
+
+        .toggle-label {
+            font-size: 0.9rem;
+            color: var(--gray-700);
+        }
+
+        .manual-input {
+            margin-top: 1rem;
+            display: none;
+        }
+
+        .manual-input textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--gray-300);
+            border-radius: var(--border-radius);
+            margin-bottom: 0.75rem;
+            resize: vertical;
+            background-color: var(--white);
+            color: var(--gray-800);
+            font-family: var(--font-family);
+            min-height: 80px;
+            transition: var(--transition);
+        }
+
+        .manual-input textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(74, 111, 165, 0.2);
+        }
+
+        .manual-input button {
+            padding: 0.5rem 1rem;
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            font-weight: 500;
+            transition: var(--transition);
+        }
+
+        .manual-input button:hover {
+            background-color: var(--primary-dark);
+        }
+
+        .debug-info {
+            margin-top: 1rem;
+            padding: 0.75rem;
+            background-color: var(--gray-100);
+            border: 1px solid var(--gray-200);
+            border-radius: var(--border-radius);
+            font-size: 0.8rem;
+            font-family: monospace;
+            color: var(--gray-700);
+            max-height: 200px;
+            overflow-y: auto;
+            display: none;
+        }
+
+        .conversation {
+            flex: 1;
+            padding: 1.5rem;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            background-color: var(--white);
+        }
+
+        .message-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .message {
+            max-width: 80%;
+            padding: 0.75rem 1rem;
+            border-radius: 1rem;
+            position: relative;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .system-message {
+            background-color: var(--primary-light);
+            color: white;
+            border-top-left-radius: 0.25rem;
+            align-self: flex-start;
+        }
+
+        .user-message {
+            background-color: var(--gray-200);
+            color: var(--gray-800);
+            border-top-right-radius: 0.25rem;
+            align-self: flex-end;
+        }
+
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.75rem 1.5rem;
+            background-color: var(--gray-100);
+            border-top: 1px solid var(--gray-200);
+            font-size: 0.85rem;
+            color: var(--gray-600);
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+        }
+
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 0.5rem;
+        }
+
+        .active {
+            background-color: var(--success);
+        }
+
+        .inactive {
+            background-color: var(--danger);
+        }
+
+        #speakingIndicator {
+            display: none;
+            color: var(--success);
+            font-weight: 500;
+            margin-top: 0.5rem;
+            text-align: center;
+            font-size: 0.9rem;
+        }
+
+        .instructions {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background-color: var(--gray-100);
+            border-radius: var(--border-radius);
+        }
+
+        .instructions h3 {
+            font-size: 1rem;
+            margin-bottom: 0.75rem;
+            color: var(--gray-700);
+            font-weight: 600;
+        }
+
+        .instructions ol {
+            padding-left: 1.5rem;
+        }
+
+        .instructions li {
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+            color: var(--gray-600);
+        }
+
+        /* Responsive design */
+        @media (max-width: 768px) {
+            .main-content {
+                flex-direction: column;
+                margin: 0;
+                border-radius: 0;
+            }
+
+            .sidebar {
+                width: 100%;
+                border-right: none;
+                border-bottom: 1px solid var(--gray-200);
+            }
+
+            .conversation {
+                height: 60vh;
+            }
+        }
+
+        /* Animations */
+        .pulse {
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        /* Tooltip styles */
+        .tooltip {
+            position: relative;
+            display: inline-block;
+        }
+
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 120px;
+            background-color: var(--gray-800);
+            color: var(--white);
+            text-align: center;
+            border-radius: 6px;
+            padding: 5px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -60px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 0.8rem;
+        }
+
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <i class="fas fa-headset"></i>
+                    Clinic Voice AI – Noor Medical Demo
+                </div>
+                <button id="themeToggle" class="theme-toggle" title="Toggle dark mode">
+                    <i class="fas fa-moon"></i>
+                </button>
+            </div>
+        </header>
+
+        <div class="main-content">
+            <div class="sidebar">
+                <div class="call-controls">
+                    <h2>Call Controls</h2>
+                    <button id="startCallBtn" class="btn btn-primary">
+                        <i class="fas fa-phone-alt"></i> Start Call
+                    </button>
+                    <button id="startSpeakingBtn" class="btn btn-success" disabled>
+                        <i class="fas fa-microphone"></i> Start Speaking
+                    </button>
+                    <button id="stopSpeakingBtn" class="btn btn-danger" disabled>
+                        <i class="fas fa-microphone-slash"></i> Stop Speaking
+                    </button>
+                    <button id="endCallBtn" class="btn btn-danger" disabled>
+                        <i class="fas fa-phone-slash"></i> End Call
+                    </button>
+                    
+                    <div id="speakingIndicator">
+                        <i class="fas fa-circle pulse"></i> Recording your voice...
+                    </div>
+                    
+                    <div class="toggle-container">
+                        <label class="toggle-switch tooltip">
+                            <input type="checkbox" id="debugModeToggle">
+                            <span class="toggle-slider"></span>
+                            <span class="tooltiptext">Show technical details</span>
+                        </label>
+                        <span class="toggle-label">Show Debug Info</span>
+                    </div>
+                    
+                    <div class="toggle-container">
+                        <label class="toggle-switch tooltip">
+                            <input type="checkbox" id="manualInputToggle">
+                            <span class="toggle-slider"></span>
+                            <span class="tooltiptext">Type instead of speak</span>
+                        </label>
+                        <span class="toggle-label">Enable Manual Input</span>
+                    </div>
+                    
+                    <div id="manualInput" class="manual-input">
+                        <textarea id="manualInputText" placeholder="Type your response here..."></textarea>
+                        <button id="sendManualInputBtn">
+                            <i class="fas fa-paper-plane"></i> Send
+                        </button>
+                    </div>
+                    
+                    <div id="debugInfo" class="debug-info"></div>
+
+                    <div class="instructions">
+                        <h3>How to Use</h3>
+                        <ol>
+                            <li>Click "Start Call" to begin a new session</li>
+                            <li>When prompted, click "Start Speaking" and speak your response</li>
+                            <li>Click "Stop Speaking" when finished</li>
+                            <li>Continue the conversation until your appointment is booked</li>
+                            <li>Click "End Call" to terminate the session</li>
+                            <li>If voice isn't working, toggle "Enable Manual Input" to type responses</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+
+            <div class="conversation" id="conversationContainer">
+                <div class="message-container" id="messageContainer">
+                    <div class="message system-message">
+                        Welcome to the Clinic Voice AI demo. Click "Start Call" to begin.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="status-bar">
+            <div class="status">
+                <span>Call Status:</span>
+                <div class="status-indicator inactive" id="callStatusIndicator"></div>
+                <span id="callStatus">Call Inactive</span>
+            </div>
+            <div class="status">
+                <span>Microphone:</span>
+                <div class="status-indicator inactive" id="micStatusIndicator"></div>
+                <span id="micStatus">Microphone Inactive</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let sessionId = null;
+        let recognition = null;
+        let audioContext = null;
+        let currentAudio = null;
+        let recognitionAttempts = 0;
+        let maxRecognitionAttempts = 3;
+        let isDebugMode = false;
+        let isManualInputEnabled = false;
+        let isDarkMode = false;
+
+        // DOM elements
+        const startCallBtn = document.getElementById('startCallBtn');
+        const startSpeakingBtn = document.getElementById('startSpeakingBtn');
+        const stopSpeakingBtn = document.getElementById('stopSpeakingBtn');
+        const endCallBtn = document.getElementById('endCallBtn');
+        const messageContainer = document.getElementById('messageContainer');
+        const conversationContainer = document.getElementById('conversationContainer');
+        const callStatusIndicator = document.getElementById('callStatusIndicator');
+        const callStatus = document.getElementById('callStatus');
+        const micStatusIndicator = document.getElementById('micStatusIndicator');
+        const micStatus = document.getElementById('micStatus');
+        const speakingIndicator = document.getElementById('speakingIndicator');
+        const debugInfo = document.getElementById('debugInfo');
+        const debugModeToggle = document.getElementById('debugModeToggle');
+        const manualInputToggle = document.getElementById('manualInputToggle');
+        const manualInput = document.getElementById('manualInput');
+        const manualInputText = document.getElementById('manualInputText');
+        const sendManualInputBtn = document.getElementById('sendManualInputBtn');
+        const themeToggle = document.getElementById('themeToggle');
+
+        // Theme toggle
+        themeToggle.addEventListener('click', function() {
+            isDarkMode = !isDarkMode;
+            if (isDarkMode) {
+                document.body.classList.add('dark-mode');
+                themeToggle.innerHTML = '<i class="fas fa-sun"></i>';
+            } else {
+                document.body.classList.remove('dark-mode');
+                themeToggle.innerHTML = '<i class="fas fa-moon"></i>';
+            }
+        });
+
+        // Debug logging function
+        function logDebug(message) {
+            if (isDebugMode) {
+                const timestamp = new Date().toLocaleTimeString();
+                const logMessage = `[${timestamp}] ${message}`;
+                debugInfo.innerHTML += logMessage + '<br>';
+                debugInfo.scrollTop = debugInfo.scrollHeight;
+                console.log(logMessage);
+            }
+        }
+
+        // Toggle debug mode
+        debugModeToggle.addEventListener('change', function() {
+            isDebugMode = this.checked;
+            debugInfo.style.display = isDebugMode ? 'block' : 'none';
+            logDebug('Debug mode ' + (isDebugMode ? 'enabled' : 'disabled'));
+        });
+
+        // Toggle manual input
+        manualInputToggle.addEventListener('change', function() {
+            isManualInputEnabled = this.checked;
+            manualInput.style.display = isManualInputEnabled ? 'block' : 'none';
+            logDebug('Manual input ' + (isManualInputEnabled ? 'enabled' : 'disabled'));
+        });
+
+        // Send manual input
+        sendManualInputBtn.addEventListener('click', function() {
+            const text = manualInputText.value.trim();
+            if (text && sessionId) {
+                addMessage(text, 'user');
+                processSpeech(text);
+                manualInputText.value = '';
+            }
+        });
+
+        // Allow Enter key to send manual input
+        manualInputText.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendManualInputBtn.click();
+            }
+        });
+
+        // Initialize Web Speech API with multiple attempts and fallbacks
+        function initSpeechRecognition() {
+            logDebug('Initializing speech recognition');
+            
+            if ('webkitSpeechRecognition' in window) {
+                recognition = new webkitSpeechRecognition();
+                logDebug('Using webkitSpeechRecognition');
+            } else if ('SpeechRecognition' in window) {
+                recognition = new SpeechRecognition();
+                logDebug('Using SpeechRecognition');
+            } else {
+                logDebug('Speech recognition not supported in this browser');
+                alert('Your browser does not support speech recognition. Please use Chrome or Edge, or enable manual input mode.');
+                manualInputToggle.checked = true;
+                isManualInputEnabled = true;
+                manualInput.style.display = 'block';
+                return;
+            }
+
+            // Configure recognition
+            recognition.continuous = false;
+            recognition.interimResults = true;
+            recognition.maxAlternatives = 3;
+            recognition.lang = 'en-US';
+
+            // Recognition events
+            recognition.onstart = function() {
+                logDebug('Recognition started');
+                updateMicStatus(true);
+            };
+
+            recognition.onresult = function(event) {
+                logDebug(`Recognition result received: ${event.results.length} results`);
+                
+                let finalTranscript = '';
+                let interimTranscript = '';
+                
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    if (event.results[i].isFinal) {
+                        finalTranscript += event.results[i][0].transcript;
+                        logDebug(`Final transcript: ${finalTranscript}`);
+                    } else {
+                        interimTranscript += event.results[i][0].transcript;
+                        logDebug(`Interim transcript: ${interimTranscript}`);
+                    }
+                }
+                
+                if (finalTranscript) {
+                    recognitionAttempts = 0;
+                    addMessage(finalTranscript, 'user');
+                    processSpeech(finalTranscript);
+                } else if (interimTranscript) {
+                    // Show interim results in debug
+                    logDebug(`Interim: ${interimTranscript}`);
+                }
+            };
+
+            recognition.onerror = function(event) {
+                logDebug(`Recognition error: ${event.error}`);
+                
+                if (event.error === 'no-speech') {
+                    logDebug('No speech detected');
+                    if (recognitionAttempts < maxRecognitionAttempts) {
+                        recognitionAttempts++;
+                        logDebug(`Retrying recognition (attempt ${recognitionAttempts}/${maxRecognitionAttempts})`);
+                        try {
+                            recognition.start();
+                        } catch (e) {
+                            logDebug(`Error restarting recognition: ${e}`);
+                        }
+                    } else {
+                        logDebug('Max recognition attempts reached');
+                        updateMicStatus(false);
+                        alert('No speech detected after multiple attempts. Please try again or use manual input.');
+                        startSpeakingBtn.disabled = false;
+                        stopSpeakingBtn.disabled = true;
+                        speakingIndicator.style.display = 'none';
+                    }
+                } else {
+                    updateMicStatus(false);
+                    startSpeakingBtn.disabled = false;
+                    stopSpeakingBtn.disabled = true;
+                    speakingIndicator.style.display = 'none';
+                }
+            };
+
+            recognition.onend = function() {
+                logDebug('Recognition ended');
+                updateMicStatus(false);
+                startSpeakingBtn.disabled = false;
+                stopSpeakingBtn.disabled = true;
+                speakingIndicator.style.display = 'none';
+            };
+            
+            logDebug('Speech recognition initialized');
+        }
+
+        // Event listeners
+        startCallBtn.addEventListener('click', startCall);
+        startSpeakingBtn.addEventListener('click', startSpeaking);
+        stopSpeakingBtn.addEventListener('click', stopSpeaking);
+        endCallBtn.addEventListener('click', endCall);
+
+        // Functions
+        function startCall() {
+            logDebug('Starting call');
+            fetch('/api/start-call', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                sessionId = data.session_id;
+                logDebug(`Call started with session ID: ${sessionId}`);
+                updateCallStatus(true);
+                startSpeakingBtn.disabled = false;
+                endCallBtn.disabled = false;
+                startCallBtn.disabled = true;
+                
+                addMessage(data.text, 'system');
+                playAudio(data.audio_url);
+            })
+            .catch(error => {
+                logDebug(`Error starting call: ${error}`);
+                console.error('Error starting call:', error);
+                alert('Error starting call. Please try again.');
+            });
+        }
+
+        function startSpeaking() {
+            logDebug('Start speaking button clicked');
+            
+            // Initialize recognition if not already done
+            if (!recognition) {
+                initSpeechRecognition();
+            }
+            
+            if (!recognition && !isManualInputEnabled) {
+                alert('Speech recognition is not available. Please enable manual input mode.');
+                manualInputToggle.checked = true;
+                isManualInputEnabled = true;
+                manualInput.style.display = 'block';
+                return;
+            }
+            
+            if (recognition) {
+                updateMicStatus(true);
+                startSpeakingBtn.disabled = true;
+                stopSpeakingBtn.disabled = false;
+                speakingIndicator.style.display = 'block';
+                recognitionAttempts = 0;
+                
+                try {
+                    // Request microphone permission explicitly
+                    navigator.mediaDevices.getUserMedia({ audio: true })
+                        .then(stream => {
+                            logDebug('Microphone permission granted');
+                            stream.getTracks().forEach(track => track.stop());
+                            
+                            try {
+                                recognition.start();
+                                logDebug('Recognition started');
+                            } catch (e) {
+                                logDebug(`Error starting recognition: ${e}`);
+                                updateMicStatus(false);
+                                startSpeakingBtn.disabled = false;
+                                stopSpeakingBtn.disabled = true;
+                                speakingIndicator.style.display = 'none';
+                                alert(`Error starting speech recognition: ${e.message}. Please try again or use manual input.`);
+                            }
+                        })
+                        .catch(err => {
+                            logDebug(`Microphone permission denied: ${err}`);
+                            updateMicStatus(false);
+                            startSpeakingBtn.disabled = false;
+                            stopSpeakingBtn.disabled = true;
+                            speakingIndicator.style.display = 'none';
+                            alert('Microphone access was denied. Please allow microphone access or use manual input.');
+                            manualInputToggle.checked = true;
+                            isManualInputEnabled = true;
+                            manualInput.style.display = 'block';
+                        });
+                } catch (error) {
+                    logDebug(`Error accessing microphone: ${error}`);
+                    updateMicStatus(false);
+                    alert('Error accessing microphone. Please try again or use manual input.');
+                }
+            }
+        }
+
+        function stopSpeaking() {
+            logDebug('Stop speaking button clicked');
+            if (recognition) {
+                recognition.stop();
+                logDebug('Recognition stopped');
+            }
+            
+            updateMicStatus(false);
+            startSpeakingBtn.disabled = false;
+            stopSpeakingBtn.disabled = true;
+            speakingIndicator.style.display = 'none';
+        }
+
+        function endCall() {
+            logDebug('End call button clicked');
+            updateCallStatus(false);
+            startCallBtn.disabled = false;
+            startSpeakingBtn.disabled = true;
+            stopSpeakingBtn.disabled = true;
+            endCallBtn.disabled = true;
+            sessionId = null;
+            
+            addMessage("Call ended. Thank you for using Noor Medical Clinic Voice AI.", 'system');
+        }
+
+        function processSpeech(transcript) {
+            if (!sessionId) {
+                logDebug('No active session, cannot process speech');
+                return;
+            }
+            
+            logDebug(`Processing speech: "${transcript}"`);
+            
+            fetch('/api/process-speech', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    session_id: sessionId,
+                    transcript: transcript
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                logDebug(`Response received: ${data.text}`);
+                addMessage(data.text, 'system');
+                playAudio(data.audio_url);
+                
+                if (data.next_state === 'end_call') {
+                    endCall();
+                }
+            })
+            .catch(error => {
+                logDebug(`Error processing speech: ${error}`);
+                console.error('Error processing speech:', error);
+                alert('Error processing your response. Please try again.');
+            });
+        }
+
+        function addMessage(text, role) {
+            logDebug(`Adding ${role} message: "${text}"`);
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${role}-message`;
+            messageDiv.textContent = text;
+            
+            messageContainer.appendChild(messageDiv);
+            conversationContainer.scrollTop = conversationContainer.scrollHeight;
+        }
+
+        function updateCallStatus(isActive) {
+            logDebug(`Call status updated: ${isActive ? 'active' : 'inactive'}`);
+            if (isActive) {
+                callStatusIndicator.className = 'status-indicator active';
+                callStatus.textContent = 'Call Active';
+            } else {
+                callStatusIndicator.className = 'status-indicator inactive';
+                callStatus.textContent = 'Call Inactive';
+            }
+        }
+
+        function updateMicStatus(isActive) {
+            logDebug(`Microphone status updated: ${isActive ? 'active' : 'inactive'}`);
+            if (isActive) {
+                micStatusIndicator.className = 'status-indicator active';
+                micStatus.textContent = 'Microphone Active';
+            } else {
+                micStatusIndicator.className = 'status-indicator inactive';
+                micStatus.textContent = 'Microphone Inactive';
+            }
+        }
+
+        function playAudio(url) {
+            if (!url) {
+                logDebug('No audio URL provided');
+                return;
+            }
+            
+            logDebug(`Playing audio from: ${url}`);
+            
+            // Stop any currently playing audio
+            if (currentAudio) {
+                currentAudio.pause();
+                currentAudio = null;
+            }
+            
+            // Create and play new audio
+            const audio = new Audio(url);
+            currentAudio = audio;
+            
+            audio.onended = function() {
+                logDebug('Audio playback ended');
+                currentAudio = null;
+                // Enable speaking button after audio finishes
+                startSpeakingBtn.disabled = false;
+            };
+            
+            // Disable speaking button while audio is playing
+            startSpeakingBtn.disabled = true;
+            
+            audio.play().catch(error => {
+                logDebug(`Error playing audio: ${error}`);
+                console.error('Error playing audio:', error);
+                startSpeakingBtn.disabled = false;
+            });
+        }
+
+        // Initialize audio context for better audio handling
+        function initAudioContext() {
+            try {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                logDebug('Audio context initialized');
+            } catch (error) {
+                logDebug(`Audio context not supported: ${error}`);
+                console.error('Audio context not supported:', error);
+            }
+        }
+
+        // Check for saved theme preference
+        function checkThemePreference() {
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme === 'dark') {
+                isDarkMode = true;
+                document.body.classList.add('dark-mode');
+                themeToggle.innerHTML = '<i class="fas fa-sun"></i>';
+            }
+        }
+
+        // Initialize on page load
+        window.addEventListener('load', function() {
+            logDebug('Page loaded');
+            initAudioContext();
+            checkThemePreference();
+            // Don't initialize speech recognition until needed
+        });
+
+        // Save theme preference when changed
+        themeToggle.addEventListener('click', function() {
+            localStorage.setItem('theme', isDarkMode ? 'dark' : 'light');
+        });
+    </script>
+</body>
+</html>
