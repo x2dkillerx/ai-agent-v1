@@ -1,48 +1,21 @@
-"""
-Updated main application with SMS confirmation integration
-"""
-
-from flask import Flask, request, render_template, jsonify, Response
+from flask import Flask, request, render_template, jsonify
 import os
 import json
 import uuid
 import logging
 from datetime import datetime
 
-# Import modules
-from src.twilio_integration import register_twilio_routes
-from src.speech_recognition import transcribe_web_audio, mock_transcribe
-from src.conversation import process_conversation, mock_process_conversation
-from src.text_to_speech import get_base64_audio, mock_synthesize_speech
-from src.google_service import (
-    initialize_google_services,
-    log_appointment,
-    create_calendar_event,
-    check_availability,
-    suggest_alternative_time
-)
-from src.sms_confirmation import send_sms_confirmation, mock_send_sms, generate_confirmation_message
+# Initialize Flask app
+app = Flask(__name__, template_folder='../templates', static_folder='../static')
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize Flask app
-app = Flask(__name__, template_folder='templates', static_folder='static')
-
 # In-memory storage for demo purposes
 # In production, this would be a database
 sessions = {}
 appointments = []
-
-# Environment variables
-DEBUG_MODE = True  # Set to False in production
-USE_MOCK_SERVICES = True  # Set to False in production to use real APIs
-
-# Initialize Google services
-google_initialized = initialize_google_services()
-if not google_initialized and not USE_MOCK_SERVICES:
-    logger.warning("Failed to initialize Google services. Some features may not work correctly.")
 
 @app.route('/')
 def index():
@@ -80,15 +53,9 @@ def start_call():
     
     sessions[session_id]['state'] = initial_response['next_state']
     
-    # Generate speech if not in mock mode
-    audio_data = None
-    if not USE_MOCK_SERVICES:
-        audio_data = get_base64_audio(initial_response['text'])
-    
     return jsonify({
         'session_id': session_id,
-        'message': initial_response['text'],
-        'audio': audio_data
+        'message': initial_response['text']
     })
 
 @app.route('/api/process-speech', methods=['POST'])
@@ -96,21 +63,10 @@ def process_speech():
     """Process transcribed speech from the caller"""
     data = request.json
     session_id = data.get('session_id')
+    transcript = data.get('transcript')
     
-    # Handle direct transcript or audio data
-    if 'transcript' in data:
-        transcript = data.get('transcript')
-    elif 'audio' in data:
-        # Process audio data through Whisper
-        if USE_MOCK_SERVICES:
-            transcript = mock_transcribe()
-        else:
-            transcript = transcribe_web_audio(data.get('audio'))
-    else:
-        return jsonify({'error': 'Missing transcript or audio data'}), 400
-    
-    if not session_id or session_id not in sessions:
-        return jsonify({'error': 'Invalid session'}), 400
+    if not session_id or not transcript or session_id not in sessions:
+        return jsonify({'error': 'Invalid session or missing transcript'}), 400
     
     # Log user input
     sessions[session_id]['conversation'].append({
@@ -120,10 +76,7 @@ def process_speech():
     })
     
     # Process the input based on current state
-    if USE_MOCK_SERVICES:
-        response = mock_process_conversation(session_id, transcript)
-    else:
-        response = process_conversation(session_id, transcript)
+    response = process_conversation(session_id, transcript)
     
     # Log system response
     sessions[session_id]['conversation'].append({
@@ -135,23 +88,145 @@ def process_speech():
     # Update session state
     sessions[session_id]['state'] = response['next_state']
     
-    # If confirming appointment, book it
-    if response['next_state'] == 'confirm_appointment' or response['next_state'] == 'closing':
-        patient_info = sessions[session_id]['patient_info']
-        if all([patient_info.get('name'), patient_info.get('service'), patient_info.get('preferred_time')]):
-            book_appointment(patient_info)
-    
-    # Generate speech if not in mock mode
-    audio_data = None
-    if not USE_MOCK_SERVICES:
-        audio_data = get_base64_audio(response['text'])
-    
     return jsonify({
         'message': response['text'],
         'state': response['next_state'],
-        'session_id': session_id,
-        'audio': audio_data
+        'session_id': session_id
     })
+
+def process_conversation(session_id, transcript):
+    """Process user input based on conversation state"""
+    session = sessions[session_id]
+    current_state = session['state']
+    patient_info = session['patient_info']
+    
+    # This is a simplified state machine
+    # In production, this would use GPT-4 for more natural conversation
+    
+    if current_state == 'collect_name':
+        # Extract name from transcript
+        # In production, use GPT-4 for better name extraction
+        patient_info['name'] = transcript.strip()
+        
+        return {
+            'text': f"Thank you, {patient_info['name']}. What service are you looking to book today? For example, dental, ENT, dermatology, or general checkup?",
+            'next_state': 'collect_service'
+        }
+        
+    elif current_state == 'collect_service':
+        # Extract service from transcript
+        patient_info['service'] = transcript.strip()
+        
+        return {
+            'text': f"Great, I have you down for {patient_info['service']}. What date and time would you prefer for your appointment?",
+            'next_state': 'collect_time'
+        }
+        
+    elif current_state == 'collect_time':
+        # Extract preferred time
+        # In production, use GPT-4 for better time/date extraction
+        patient_info['preferred_time'] = transcript.strip()
+        
+        # Check availability (mock implementation)
+        is_available = check_availability(patient_info['service'], patient_info['preferred_time'])
+        
+        if is_available:
+            return {
+                'text': f"Perfect! I can book you for {patient_info['preferred_time']}. Could I get your phone number for a confirmation SMS?",
+                'next_state': 'collect_phone'
+            }
+        else:
+            # Suggest alternative time (mock implementation)
+            alternative_time = suggest_alternative(patient_info['service'], patient_info['preferred_time'])
+            return {
+                'text': f"I'm sorry, but {patient_info['preferred_time']} is not available. We do have an opening at {alternative_time}. Would that work for you?",
+                'next_state': 'confirm_alternative_time'
+            }
+            
+    elif current_state == 'confirm_alternative_time':
+        # Check if user accepts alternative time
+        if 'yes' in transcript.lower() or 'sure' in transcript.lower() or 'okay' in transcript.lower():
+            # Update preferred time with the alternative
+            patient_info['preferred_time'] = suggest_alternative(patient_info['service'], patient_info['preferred_time'])
+            
+            return {
+                'text': f"Great! I've booked you for {patient_info['preferred_time']}. Could I get your phone number for a confirmation SMS?",
+                'next_state': 'collect_phone'
+            }
+        else:
+            # Suggest another alternative
+            alternative_time = suggest_alternative(patient_info['service'], patient_info['preferred_time'], second_try=True)
+            return {
+                'text': f"I understand. We also have an opening at {alternative_time}. Would that work better for you?",
+                'next_state': 'confirm_alternative_time'
+            }
+            
+    elif current_state == 'collect_phone':
+        # Extract phone number
+        patient_info['phone_number'] = transcript.strip()
+        
+        # Book the appointment (mock implementation)
+        book_appointment(patient_info)
+        
+        return {
+            'text': f"Thank you! I've booked your {patient_info['service']} appointment for {patient_info['preferred_time']}. You'll receive a confirmation SMS shortly at {patient_info['phone_number']}. Is there anything else I can help you with today?",
+            'next_state': 'closing'
+        }
+        
+    elif current_state == 'closing':
+        if 'yes' in transcript.lower():
+            return {
+                'text': "What else can I help you with today?",
+                'next_state': 'new_request'
+            }
+        else:
+            return {
+                'text': "Thank you for calling Noor Medical Clinic. Have a great day!",
+                'next_state': 'end_call'
+            }
+            
+    else:
+        # Default response for unhandled states
+        return {
+            'text': "I'm sorry, I didn't quite catch that. Could you please repeat?",
+            'next_state': current_state
+        }
+
+def check_availability(service, preferred_time):
+    """Mock function to check appointment availability"""
+    # In production, this would check Google Calendar
+    # For demo, return True 70% of the time
+    import random
+    return random.random() > 0.3
+
+def suggest_alternative(service, preferred_time, second_try=False):
+    """Mock function to suggest alternative appointment times"""
+    # In production, this would check Google Calendar for actual availability
+    if 'am' in preferred_time.lower():
+        return "2:00 PM tomorrow" if second_try else "3:30 PM today"
+    else:
+        return "10:30 AM tomorrow" if second_try else "9:15 AM tomorrow"
+
+def book_appointment(patient_info):
+    """Mock function to book an appointment"""
+    # In production, this would:
+    # 1. Add to Google Calendar
+    # 2. Log to Google Sheets
+    # 3. Send SMS confirmation
+    
+    # For demo, just add to in-memory list
+    appointment = {
+        'id': str(uuid.uuid4()),
+        'timestamp': datetime.now().isoformat(),
+        'patient_name': patient_info['name'],
+        'service': patient_info['service'],
+        'scheduled_time': patient_info['preferred_time'],
+        'phone_number': patient_info['phone_number']
+    }
+    
+    appointments.append(appointment)
+    logger.info(f"Booked appointment: {json.dumps(appointment)}")
+    return appointment
 
 @app.route('/api/get-conversation', methods=['GET'])
 def get_conversation():
@@ -172,67 +247,5 @@ def get_appointments():
     """Get all booked appointments (for demo purposes)"""
     return jsonify(appointments)
 
-def book_appointment(patient_info):
-    """Book an appointment and handle integrations"""
-    # Create appointment record
-    appointment = {
-        'id': str(uuid.uuid4()),
-        'timestamp': datetime.now().isoformat(),
-        'patient_name': patient_info['name'],
-        'service': patient_info['service'],
-        'scheduled_time': patient_info['preferred_time'],
-        'phone_number': patient_info['phone_number']
-    }
-    
-    # Add to in-memory list
-    appointments.append(appointment)
-    
-    # Log the appointment
-    logger.info(f"Booked appointment: {json.dumps(appointment)}")
-    
-    # Log to Google Sheets
-    sheets_result = log_appointment(appointment)
-    if not sheets_result:
-        logger.warning("Failed to log appointment to Google Sheets")
-    
-    # Add to Google Calendar
-    calendar_result = create_calendar_event(appointment)
-    if not calendar_result:
-        logger.warning("Failed to create calendar event")
-    
-    # Send SMS confirmation if phone number is provided
-    if patient_info['phone_number']:
-        # Generate confirmation message
-        message = generate_confirmation_message(appointment)
-        
-        # Send SMS
-        if USE_MOCK_SERVICES:
-            sms_result, sms_id = mock_send_sms(patient_info['phone_number'], message)
-        else:
-            sms_result, sms_id = send_sms_confirmation(patient_info['phone_number'], message)
-        
-        if not sms_result:
-            logger.warning(f"Failed to send SMS confirmation: {sms_id}")
-        else:
-            logger.info(f"SMS confirmation sent: {sms_id}")
-            
-            # Add SMS ID to appointment record for status tracking
-            appointment['sms_id'] = sms_id
-    
-    return appointment
-
-def check_time_availability(service, preferred_time):
-    """Check appointment availability"""
-    # Use Google Calendar in production
-    return check_availability(service, preferred_time)
-
-def suggest_alternative_appointment_time(service, preferred_time, second_try=False):
-    """Suggest alternative appointment times"""
-    # Use Google Calendar in production
-    return suggest_alternative_time(service, preferred_time)
-
-# Register Twilio routes
-register_twilio_routes(app, process_conversation if not USE_MOCK_SERVICES else mock_process_conversation)
-
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=DEBUG_MODE)
+    app.run(host='0.0.0.0', port=5000, debug=True)
