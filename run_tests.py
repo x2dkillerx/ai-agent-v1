@@ -4,9 +4,10 @@ Test runner script for Clinic Voice AI
 This script runs the automated test scenarios and generates a test report.
 """
 
-import os
 import logging
-from src.test_scenarios import run_all_tests, generate_test_report
+import subprocess
+import time
+from test_scenarios import run_all_tests, generate_test_report
 
 # Configure logging
 logging.basicConfig(
@@ -17,10 +18,20 @@ logger = logging.getLogger(__name__)
 
 if __name__ == "__main__":
     logger.info("Running Clinic Voice AI tests")
-    
-    # Run tests
-    results = run_all_tests()
-    
+
+    # Start the Flask demo server
+    server = subprocess.Popen(["python", "run.py"])  # noqa: S603,S607
+
+    # Give the server a moment to start
+    time.sleep(2)
+
+    try:
+        # Run tests
+        results = run_all_tests()
+    finally:
+        server.terminate()
+        server.wait()
+
     # Generate report
     report = generate_test_report(results)
     

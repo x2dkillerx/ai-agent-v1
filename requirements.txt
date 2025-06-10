@@ -1,6 +1,4 @@
-"""
-Requirements file for Clinic Voice AI
-"""
+# Requirements file for Clinic Voice AI
 
 # Web Framework
 flask==2.2.3
@@ -25,6 +23,9 @@ pydub==0.25.1
 
 # Environment Variables
 python-dotenv==1.0.0
+
+# Flask 2.x requires werkzeug < 3
+werkzeug<3
 
 # Testing
 pytest==7.3.1
