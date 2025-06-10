@@ -365,6 +365,7 @@ def start_call():
         'trust_established': False,
         'context_memory': {},
         'current_doctor_discussed': None,
+        'rejected_doctors': set(),
         'was_interrupted': False,
         'last_response_time': datetime.now().isoformat()
     }
@@ -430,6 +431,26 @@ def process_speech():
         emotional_state = new_emotional_state
         session['emotional_state'] = emotional_state
         logger.info(f"Detected emotional state: {emotional_state}")
+
+    # Handle if the user rejected a suggested doctor
+    if check_doctor_rejection(transcript, session):
+        service_type = get_service_category(patient_info.get('service', ''))
+        new_doctor = get_available_doctor(service_type, session)
+        session['current_doctor_discussed'] = new_doctor.get('name')
+        response_text = (
+            f"No problem, we can look at other options. {new_doctor['name']} is available"
+            f" and specializes in {new_doctor['specialty']}. Would you like to schedule"
+            f" with them?"
+        )
+        response_text = add_human_touches(response_text)
+        session['conversation'].append({
+            'role': 'system',
+            'text': response_text,
+            'timestamp': datetime.now().isoformat(),
+        })
+        audio_url = generate_voice(response_text, emotion="reassuring")
+        sessions[session_id] = session
+        return jsonify({'text': response_text, 'audio_url': audio_url, 'next_state': current_state})
     
     # Check for humor or jokes
     humor_response = check_for_humor(transcript)
@@ -651,6 +672,7 @@ def process_speech():
         if name:
             patient_info['name'] = name
             context_memory['patient_name'] = name
+            session['fallback_count'] = 0
             
             # Personalized greeting with the patient's name
             response_text = f"{add_filler()} It's lovely to meet you, {name}! {add_filler()} My name is Rachel, and I'm the receptionist here at Noor Medical. What type of appointment are you looking to schedule today? We offer dental, ENT, dermatology, and general checkups."
@@ -677,7 +699,7 @@ def process_speech():
             next_state = 'collect_service'
         else:
             # If we still can't extract a name, ask for clarification
-            response_text = f"{add_filler()} I'm sorry, I didn't quite catch your name. Could you please repeat it for me?"
+            response_text = handle_fallback(session, f"{add_filler()} I'm sorry, I didn't quite catch your name. Could you please repeat it for me?")
             next_state = 'collect_name'
         
     elif current_state == 'collect_service':
@@ -687,11 +709,12 @@ def process_speech():
         if service:
             patient_info['service'] = service
             context_memory['service_type'] = service
+            session['fallback_count'] = 0
             
             # Personalize with doctor information
             doctors_list = DOCTORS.get(service, [])
             if doctors_list:
-                doctor = random.choice(doctors_list)
+                doctor = get_available_doctor(service, session)
                 doctor_name = doctor["name"]
                 doctor_specialty = doctor["specialty"]
                 doctor_personality = doctor["personality"]
@@ -721,7 +744,7 @@ def process_speech():
             if "what" in transcript.lower() and any(word in transcript.lower() for word in ["services", "offer", "provide", "available"]):
                 response_text = f"{add_filler()} We offer a wide range of services at Noor Medical Clinic, including dental care, ENT (ear, nose, and throat), dermatology, and general medical checkups. Our doctors are all board-certified with excellent reputations. Which service were you interested in today?"
             else:
-                response_text = f"I'm sorry, {add_filler()} I didn't quite catch which service you need. We offer dental care, ENT services, dermatology, and general checkups. Which one would you like to schedule?"
+                response_text = handle_fallback(session, f"I'm sorry, {add_filler()} I didn't quite catch which service you need. We offer dental care, ENT services, dermatology, and general checkups. Which one would you like to schedule?")
             next_state = 'collect_service'
         
     elif current_state == 'collect_time':
@@ -731,6 +754,7 @@ def process_speech():
         if preferred_time:
             patient_info['preferred_time'] = preferred_time
             context_memory['appointment_time'] = preferred_time
+            session['fallback_count'] = 0
             
             # Check availability with more realistic logic
             service_type = get_service_category(patient_info.get('service', ''))
@@ -747,14 +771,13 @@ def process_speech():
                 
                 # Get doctor information for personalization
                 doctors_list = DOCTORS.get(service_type, [])
-                if doctors_list and session.get('current_doctor_discussed'):
-                    # Try to use the previously discussed doctor
-                    doctor_name = session.get('current_doctor_discussed')
-                    doctor = next((d for d in doctors_list if d["name"] == doctor_name), random.choice(doctors_list))
+                if doctors_list:
+                    doctor = get_available_doctor(service_type, session)
                 else:
-                    doctor = random.choice(doctors_list) if doctors_list else {"name": "our specialist"}
-                
+                    doctor = {"name": "our specialist"}
+
                 doctor_name = doctor["name"] if isinstance(doctor, dict) else doctor
+                session['current_doctor_discussed'] = doctor_name
                 
                 response_text = f"{add_filler()} I just checked the schedule, and unfortunately {preferred_time} is already booked for {patient_info['service']}. {doctor_name} does have availability on {alternative_time} though. Would that work for you instead?"
                 next_state = 'confirm_alternative_time'
@@ -763,16 +786,11 @@ def process_speech():
             if "available" in transcript.lower() or "schedule" in transcript.lower() or "free" in transcript.lower():
                 service_type = get_service_category(patient_info.get('service', ''))
                 doctors_list = DOCTORS.get(service_type, [])
-                
+
                 if doctors_list:
-                    if session.get('current_doctor_discussed'):
-                        # Try to use the previously discussed doctor
-                        doctor_name = session.get('current_doctor_discussed')
-                        doctor = next((d for d in doctors_list if d["name"] == doctor_name), random.choice(doctors_list))
-                    else:
-                        doctor = random.choice(doctors_list)
-                    
+                    doctor = get_available_doctor(service_type, session)
                     doctor_name = doctor["name"] if isinstance(doctor, dict) else doctor
+                    session['current_doctor_discussed'] = doctor_name
                     doctor_availability = doctor["availability"] if isinstance(doctor, dict) and "availability" in doctor else ["Monday", "Wednesday", "Friday"]
                     
                     avail_str = f"{doctor_availability[0]} and {doctor_availability[1]}" if len(doctor_availability) > 1 else doctor_availability[0]
@@ -781,7 +799,8 @@ def process_speech():
                 else:
                     response_text = f"Our {service_type} specialists have various availability throughout the week. {add_filler()} Do you have a specific day or time that works best for you?"
             else:
-                response_text = f"{add_filler()} I'd be happy to find a convenient time for you. Do you prefer mornings or afternoons? We have appointments available throughout the week, and even some Saturday morning slots for certain services."
+                msg = f"{add_filler()} I'd be happy to find a convenient time for you. Do you prefer mornings or afternoons? We have appointments available throughout the week, and even some Saturday morning slots for certain services."
+                response_text = handle_fallback(session, msg)
             next_state = 'collect_time'
             
     elif current_state == 'confirm_alternative_time':
@@ -807,13 +826,12 @@ def process_speech():
             if "doctor" in transcript.lower() or "who" in transcript.lower() or "good" in transcript.lower():
                 service_type = get_service_category(patient_info.get('service', ''))
                 doctors_list = DOCTORS.get(service_type, [])
-                
-                if doctors_list and session.get('current_doctor_discussed'):
-                    # Try to use the previously discussed doctor
-                    doctor_name = session.get('current_doctor_discussed')
-                    doctor = next((d for d in doctors_list if d["name"] == doctor_name), random.choice(doctors_list))
+
+                if doctors_list:
+                    doctor = get_available_doctor(service_type, session)
+                    session['current_doctor_discussed'] = doctor['name'] if isinstance(doctor, dict) else doctor
                 else:
-                    doctor = random.choice(doctors_list) if doctors_list else {"name": "our specialist", "patients_say": "they provide excellent care"}
+                    doctor = {"name": "our specialist", "patients_say": "they provide excellent care"}
                 
                 # Build trust with specific details
                 if isinstance(doctor, dict):
@@ -852,16 +870,17 @@ def process_speech():
             if is_valid_uae_phone(phone):
                 patient_info['phone'] = phone
                 context_memory['phone_number'] = phone
+                session['fallback_count'] = 0
                 
                 # Confirm the phone number to ensure accuracy
                 formatted_phone = format_uae_phone(phone)
                 response_text = f"Let me confirm that phone number - {formatted_phone}. Is that correct? {add_filler()} This is the number we'll use to send your appointment confirmation."
                 next_state = 'confirm_phone'
             else:
-                response_text = f"{add_filler()} That doesn't seem to be a valid UAE phone number. Could you please provide your phone number again? It should start with 05 or +971."
+                response_text = handle_fallback(session, f"{add_filler()} That doesn't seem to be a valid UAE phone number. Could you please provide your phone number again? It should start with 05 or +971.")
                 next_state = 'collect_phone'
         else:
-            response_text = f"I'm sorry, {add_filler()} I didn't quite catch your phone number. Could you please provide it again? We'll use it to send you a confirmation text and appointment reminder."
+            response_text = handle_fallback(session, f"I'm sorry, {add_filler()} I didn't quite catch your phone number. Could you please provide it again? We'll use it to send you a confirmation text and appointment reminder.")
             next_state = 'collect_phone'
     
     elif current_state == 'confirm_phone':
@@ -889,14 +908,13 @@ def process_speech():
             service_type = get_service_category(patient_info.get('service', ''))
             doctors_list = DOCTORS.get(service_type, [])
             
-            if doctors_list and session.get('current_doctor_discussed'):
-                # Try to use the previously discussed doctor
-                doctor_name = session.get('current_doctor_discussed')
-                doctor = next((d for d in doctors_list if d["name"] == doctor_name), random.choice(doctors_list))
+            if doctors_list:
+                doctor = get_available_doctor(service_type, session)
                 doctor_name = doctor["name"] if isinstance(doctor, dict) else doctor
+                session['current_doctor_discussed'] = doctor_name
             else:
-                doctor = random.choice(doctors_list) if doctors_list else {"name": "our specialist"}
-                doctor_name = doctor["name"] if isinstance(doctor, dict) else doctor
+                doctor = {"name": "our specialist"}
+                doctor_name = doctor["name"]
             
             response_text = f"Perfect! {add_filler()} I've booked your {patient_info['service']} appointment with {doctor_name} for {patient_info['preferred_time']}. You'll receive a text confirmation at {format_uae_phone(patient_info['phone'])} shortly, and a reminder the day before your appointment. Is there anything else I can help you with today? Any questions about preparing for your visit?"
             next_state = 'confirm_complete'
@@ -950,7 +968,8 @@ def process_speech():
             response_text = f"{add_filler()} We have excellent doctors in all our departments. Could you tell me what type of specialist you'd like to see? We have dental, ENT, dermatology, and general practice doctors."
             next_state = 'collect_service'
         else:
-            response_text = f"I'm sorry, {add_filler()} I didn't quite catch that. Could you please repeat what you said? I want to make sure I'm helping you correctly."
+            msg = f"I'm sorry, {add_filler()} I didn't quite catch that. Could you please repeat what you said? I want to make sure I'm helping you correctly."
+            response_text = handle_fallback(session, msg)
             next_state = current_state
     
     # Add empathy based on detected emotion
@@ -1268,6 +1287,59 @@ def add_human_touches(text):
     
     return text
 
+# Fallback helper to escalate when repeated misunderstandings occur
+def handle_fallback(session, default_message):
+    """Return a fallback message and update fallback counter."""
+    count = session.get('fallback_count', 0) + 1
+    session['fallback_count'] = count
+
+    if count == 1:
+        return default_message
+    elif count == 2:
+        return f"{default_message} Could you rephrase it another way?"
+    else:
+        return "I'm still having trouble understanding. Would you like me to connect you to a staff member for further assistance?"
+
+# Doctor helper utilities
+def get_available_doctor(service_type, session):
+    """Return a doctor not previously rejected."""
+    doctors_list = DOCTORS.get(service_type, [])
+    rejected = session.get('rejected_doctors', set())
+    available = [d for d in doctors_list if d.get('name') not in rejected]
+    if not available:
+        available = doctors_list
+    return random.choice(available) if available else {"name": "our specialist"}
+
+
+def check_doctor_rejection(text, session):
+    """Detect if the user rejected the currently suggested doctor."""
+    current_doctor = session.get('current_doctor_discussed')
+    if not current_doctor:
+        return False
+
+    text_lower = text.lower()
+    doctor_last = current_doctor.split()[-1].lower()
+    doctor_first = current_doctor.split()[1].lower() if len(current_doctor.split()) > 1 else doctor_last
+
+    rejection_triggers = [
+        'another doctor',
+        'different doctor',
+        'someone else',
+        "don't want",
+        'not ' + doctor_first,
+        'not ' + doctor_last,
+    ]
+
+    if any(trigger in text_lower for trigger in rejection_triggers) or (
+        (doctor_first in text_lower or doctor_last in text_lower) and is_negative(text_lower)
+    ):
+        rejected = session.setdefault('rejected_doctors', set())
+        rejected.add(current_doctor)
+        session['current_doctor_discussed'] = None
+        return True
+
+    return False
+
 # NLP Helper Functions
 def extract_name(text):
     """Extract name from user input with improved NLP"""
@@ -1372,15 +1444,14 @@ def extract_phone(text):
     
     # Check for common phone number patterns
     if len(digits_only) >= 9:
-        # UAE phone numbers typically start with 05 and are 10 digits long
+        # UAE mobile numbers typically start with 05 and are 10 digits long
         if digits_only.startswith('05') and len(digits_only) >= 10:
             return digits_only[:10]
-        # Or they start with 971 (country code)
+        # Numbers may also include the country code (971 or 00971)
         elif digits_only.startswith('971') and len(digits_only) >= 12:
             return digits_only[:12]
-        # Or they might start with +971
-        elif digits_only.startswith('971') and len(digits_only) >= 12:
-            return digits_only[:12]
+        elif digits_only.startswith('00971') and len(digits_only) >= 14:
+            return digits_only[:14]
     
     # If no clear phone number pattern, return None
     return None

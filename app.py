@@ -6,7 +6,8 @@ import logging
 from datetime import datetime
 
 # Initialize Flask app
-app = Flask(__name__, template_folder='../templates', static_folder='../static')
+# Use directories relative to this file so the app can run from the project root
+app = Flask(__name__, template_folder='templates', static_folder='static')
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
